@@ -73,3 +73,41 @@ module "apigateway_data_source" {
   role_arn     = aws_iam_role.appsync.arn
   region       = data.aws_region.current.name
 }
+
+resource "aws_iam_role" "appsync_api_role" {
+  name               = "appsync_api_role"
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "apigateway.amazonaws.com"
+      },
+      "Effect": "Allow"
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy" "appsync_api_role_policy" {
+  name = "appsync_api_role_policy"
+  role = aws_iam_role.appsync_api_role.id
+
+  policy = <<-EOF
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Action": [
+          "appsync:GraphQL"
+        ],
+        "Effect": "Allow",
+        "Resource": "${aws_appsync_graphql_api.graphql.arn}/*"
+      }
+    ]
+  }
+  EOF
+}
