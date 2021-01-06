@@ -83,6 +83,13 @@ resource "aws_iam_role" "appsync" {
 EOF
 }
 
+locals {
+  database_name     = "testdb"
+  database_user     = "master"
+  database_password = "password"
+  rds_data_source   = "rds"
+}
+
 resource "aws_secretsmanager_secret" "secret" {
   name = "test-secret"
 }
@@ -91,12 +98,12 @@ resource "aws_secretsmanager_secret_version" "secret_val" {
   secret_id     = aws_secretsmanager_secret.secret.id
   secret_string = <<-EOF
   {
-    "username": "master",
-    "database": "new_test",
+    "username": "${local.database_user}",
+    "database": "${local.database_name}",
     "engine": "aurora-postgresql",
     "port": 5432,
     "host": "localhost",
-    "password": "password"
+    "password": "${local.database_password}"
   }
   EOF
 }
@@ -110,9 +117,9 @@ resource "aws_cloudformation_stack" "rds_datasource_bridge" {
     ApiId               = aws_appsync_graphql_api.graphql.id
     ServiceRoleArn      = aws_iam_role.appsync.arn
     AwsSecretStoreArn   = aws_secretsmanager_secret.secret.arn
-    DatabaseName        = "new_test"
+    DatabaseName        = local.database_name
     DbClusterIdentifier = aws_rds_cluster.postgresql.arn
-    DataSourceName      = "rds"
+    DataSourceName      = local.rds_data_source
   }
 
   template_body = <<EOF
@@ -155,9 +162,9 @@ resource "aws_rds_cluster" "postgresql" {
   engine                  = "aurora-postgresql"
   engine_version          = "10.12"
   engine_mode             = "serverless"
-  database_name           = "new_test"
-  master_username         = "master"
-  master_password         = "password"
+  database_name           = local.database_name
+  master_username         = local.database_user
+  master_password         = local.database_password
   port                    = 5432
   backup_retention_period = 3
   preferred_backup_window = "07:28-07:58"
@@ -175,7 +182,7 @@ resource "aws_appsync_resolver" "resolver" {
   api_id      = aws_appsync_graphql_api.graphql.id
   type        = "Query"
   field       = "accounts"
-  data_source = "rds"
+  data_source = local.rds_data_source
   kind        = "UNIT"
 
   depends_on = [aws_cloudformation_stack.rds_datasource_bridge]
